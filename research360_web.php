@@ -286,10 +286,27 @@ function getTotalSuccess($statsFile) {
 // Process referral
 $result = null;
 $storedLink = isset($_SESSION['referral_link']) ? $_SESSION['referral_link'] : '';
+$autoSubmitStopped = isset($_SESSION['auto_submit_stopped']) ? $_SESSION['auto_submit_stopped'] : false;
+
+// Handle stop/start action via AJAX
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    header('Content-Type: application/json');
+    if ($_POST['action'] === 'stop') {
+        $_SESSION['auto_submit_stopped'] = true;
+        echo json_encode(['success' => true, 'status' => 'stopped']);
+    } elseif ($_POST['action'] === 'start') {
+        $_SESSION['auto_submit_stopped'] = false;
+        echo json_encode(['success' => true, 'status' => 'started']);
+    } else {
+        echo json_encode(['success' => false]);
+    }
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['referral_link'])) {
     $referralLink = trim($_POST['referral_link']);
     $_SESSION['referral_link'] = $referralLink; // Store in session for continuous auto-submit
+    $_SESSION['auto_submit_stopped'] = false; // Reset stop state when new link is submitted
     
     $result = [
         'success' => false,
@@ -682,13 +699,13 @@ $totalSuccess = getTotalSuccess($statsFile);
                 <p style="margin-top: 10px; color: #667eea;">Processing referral...</p>
             </div>
             
-            <?php if ($result): ?>
-            <div id="autoSubmitSection" style="background: #e3f2fd; padding: 15px; border-radius: 10px; margin-top: 20px; text-align: center;">
+            <?php if ($result || !empty($storedLink)): ?>
+            <div id="autoSubmitSection" style="background: #e3f2fd; padding: 15px; border-radius: 10px; margin-top: 20px; text-align: center; display: none;">
                 <p style="color: #1976d2; font-weight: 600; margin-bottom: 10px;">
                     ⏱️ Auto-submit: <span id="countdown">2</span> seconds
                 </p>
                 <p id="autoStatus" style="color: #666; font-size: 12px; margin-bottom: 10px;">Next submission in progress...</p>
-                <button type="button" id="stopBtn" onclick="stopAutoSubmit()" style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-family: 'Poppins', sans-serif;">
+                <button type="button" id="stopBtn" onclick="toggleAutoSubmit()" style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-family: 'Poppins', sans-serif;">
                     ⏹️ Stop Auto-Submit
                 </button>
             </div>
@@ -715,6 +732,17 @@ $totalSuccess = getTotalSuccess($statsFile);
                 clearInterval(autoSubmitInterval);
             }
             isAutoSubmitRunning = true;
+            countdown = 2;
+            
+            // Save start state to server
+            fetch(window.location.href, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=start'
+            });
+            
             const countdownElement = document.getElementById('countdown');
             const statusElement = document.getElementById('autoStatus');
             const stopBtn = document.getElementById('stopBtn');
@@ -748,13 +776,22 @@ $totalSuccess = getTotalSuccess($statsFile);
                 clearInterval(autoSubmitInterval);
                 autoSubmitInterval = null;
             }
+            
+            // Save stop state to server
+            fetch(window.location.href, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=stop'
+            });
+            
             const stopBtn = document.getElementById('stopBtn');
             const statusElement = document.getElementById('autoStatus');
             
             if (stopBtn) {
                 stopBtn.textContent = '▶️ Start Auto-Submit';
                 stopBtn.style.background = '#4caf50';
-                stopBtn.onclick = startAutoSubmit;
             }
             
             if (statusElement) {
@@ -762,15 +799,25 @@ $totalSuccess = getTotalSuccess($statsFile);
             }
         }
         
+        function toggleAutoSubmit() {
+            const stopBtn = document.getElementById('stopBtn');
+            if (stopBtn.textContent.includes('Stop')) {
+                stopAutoSubmit();
+            } else {
+                startAutoSubmit();
+            }
+        }
+        
         // Start auto-submit only after user submits form first time
         window.addEventListener('load', function() {
             <?php if ($result): ?>
-            // If result is shown, show controls and auto-submit after 2 seconds
+            // If result is shown, show controls and auto-submit after 2 seconds (if not stopped)
             const autoSubmitSection = document.getElementById('autoSubmitSection');
             if (autoSubmitSection) {
                 autoSubmitSection.style.display = 'block';
             }
             
+            <?php if (!$autoSubmitStopped): ?>
             // Auto-submit form after 2 seconds to continue the loop
             let redirectCountdown = 2;
             const redirectElement = document.getElementById('redirectCountdown');
@@ -790,14 +837,40 @@ $totalSuccess = getTotalSuccess($statsFile);
                 }
             }, 1000);
             <?php else: ?>
-            // Check if we have a stored link from session - if yes, start auto-submit
+            // Auto-submit is stopped, show stopped state
+            const stopBtn = document.getElementById('stopBtn');
+            const statusElement = document.getElementById('autoStatus');
+            if (stopBtn) {
+                stopBtn.textContent = '▶️ Start Auto-Submit';
+                stopBtn.style.background = '#4caf50';
+            }
+            if (statusElement) {
+                statusElement.textContent = 'Auto-submit stopped. Click button to resume.';
+            }
+            <?php endif; ?>
+            <?php else: ?>
+            // Check if we have a stored link from session
             <?php if (!empty($storedLink)): ?>
-            // Link is stored in session, start auto-submit automatically
+            // Link is stored in session, show controls
             const autoSubmitSection = document.getElementById('autoSubmitSection');
             if (autoSubmitSection) {
                 autoSubmitSection.style.display = 'block';
             }
+            <?php if (!$autoSubmitStopped): ?>
+            // Start auto-submit automatically if not stopped
             startAutoSubmit();
+            <?php else: ?>
+            // Show stopped state
+            const stopBtn = document.getElementById('stopBtn');
+            const statusElement = document.getElementById('autoStatus');
+            if (stopBtn) {
+                stopBtn.textContent = '▶️ Start Auto-Submit';
+                stopBtn.style.background = '#4caf50';
+            }
+            if (statusElement) {
+                statusElement.textContent = 'Auto-submit stopped. Click button to resume.';
+            }
+            <?php endif; ?>
             <?php else: ?>
             // No stored link - wait for user to submit first
             const autoSubmitSection = document.getElementById('autoSubmitSection');
