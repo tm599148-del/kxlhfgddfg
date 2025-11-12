@@ -1,0 +1,7 @@
+# For Apache servers (InfinityFree, 000webhost, etc.)
+DirectoryIndex research360_web.php
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ research360_web.php [QSA,L]
+

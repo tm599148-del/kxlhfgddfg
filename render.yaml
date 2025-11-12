@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: research360-bot
+    env: php
+    buildCommand: ""
+    startCommand: php -S 0.0.0.0:$PORT research360_web.php
+    envVars:
+      - key: PHP_VERSION
+        value: 8.2
+

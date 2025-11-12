@@ -1,0 +1,8 @@
+node_modules
+.git
+*.log
+research360_logs.json
+research360_stats.json
+.env
+.railway
+

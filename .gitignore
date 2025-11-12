@@ -1,0 +1,15 @@
+# Log files
+research360_logs.json
+research360_stats.json
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+.vercel
