@@ -1,2 +1,2 @@
-web: php -S 0.0.0.0:$PORT research360_web.php
+web: php -S 0.0.0.0:$PORT -t . research360_web.php
 
